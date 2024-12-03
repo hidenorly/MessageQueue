@@ -21,19 +21,53 @@
 #include <queue>
 #include <string>
 
-class MessageQueue {
+template <typename T>
+class TMessageQueue {
     std::mutex mMutex;
     std::queue<std::string> mQueue;
     std::condition_variable mEvent;
     bool mIsShuttingDown = false;
 
    public:
-    MessageQueue();
-    virtual ~MessageQueue();
-    // Enqueue word (expect to use by sender thread, etc.)
-    void enqueue(std::string word);
-    // Dequeue the stored word (expect to use by receiver thread, etc.)
+    TMessageQueue() = default;
+
+    virtual ~TMessageQueue(){
+        mIsShuttingDown = true;
+        mEvent.notify_all();
+    };
+
+    // Enqueue message (expect to use by sender thread, etc.)
+    void enqueue(T message){
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            mQueue.push(std::move(message));
+        }
+        mEvent.notify_one();
+    }
+
+    // Dequeue the stored message (expect to use by receiver thread, etc.)
     // Note that this blocks the caller thread when the queue is empty until
-    // enqueuing
-    std::string dequeue(void);
+    // enqueuing 
+    T dequeue(void){
+        T result;
+        {
+            std::unique_lock<std::mutex> lock(mMutex);
+            mEvent.wait(lock, [&] { return mIsShuttingDown || !mQueue.empty(); });
+            if (!mIsShuttingDown) {
+                result = std::move(mQueue.front());
+                mQueue.pop();
+            }
+        }
+        return result;
+    }
+
+    // shutdown the queue
+    void shutdown() {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mIsShuttingDown = true;
+        mEvent.notify_all();
+    }
 };
+
+// for backward compatibility
+using MessageQueue = TMessageQueue<std::string>;

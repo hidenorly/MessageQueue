@@ -14,6 +14,8 @@
    limitations under the License.
 */
 
+#if 0
+
 #include "MessageQueue.hpp"
 
 MessageQueue::MessageQueue() {}
@@ -43,3 +45,5 @@ std::string MessageQueue::dequeue(void) {
     }
     return result;
 }
+
+#endif
