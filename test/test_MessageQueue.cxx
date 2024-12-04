@@ -18,6 +18,7 @@
 
 #include <thread>
 #include <vector>
+#include <chrono>
 
 #include "MessageQueue.hpp"
 
@@ -70,6 +71,30 @@ TEST(MessageQueueTest, ThreadSafety) {
 
     std::thread senderThread(sender);
     std::thread receiverThread(receiver);
+
+    senderThread.join();
+    receiverThread.join();
+}
+
+TEST(MessageQueueTest, ShutdownTest) {
+    MessageQueue pipe;
+
+    auto sender = [&pipe]() {
+        for (int i = 0; i < 1; ++i) {
+            pipe.enqueue("word" + std::to_string(i));
+        }
+    };
+
+    auto receiver = [&pipe]() {
+        for (int i = 0; i < 1000; ++i) {
+            std::string word = pipe.dequeue();
+        }
+    };
+
+    std::thread senderThread(sender);
+    std::thread receiverThread(receiver);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pipe.shutdown();
 
     senderThread.join();
     receiverThread.join();
